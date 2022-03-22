@@ -32,6 +32,7 @@ public class NetworkClient : SocketIOComponent
     private Transform networkContainer;
 
     public Dictionary<string, NetworkIdentity> serverObjects;
+    public Dictionary<string, VehicleControl> _vc;
     public Dictionary<string,float> otherPlayersPreviousPosX;
     public Dictionary<string,float> otherPlayersPreviousPosY;
     public Dictionary<string,float> otherPlayersPreviousPosZ;
@@ -116,6 +117,7 @@ public class NetworkClient : SocketIOComponent
     private void Initialize()
     {
         serverObjects = new Dictionary<string, NetworkIdentity>();
+        _vc = new Dictionary<string, VehicleControl>();
         otherPlayersPreviousPosX = new Dictionary<string, float>();
         otherPlayersPreviousPosY = new Dictionary<string, float>();
         otherPlayersPreviousPosZ = new Dictionary<string, float>();
@@ -314,46 +316,57 @@ public class NetworkClient : SocketIOComponent
 
         On("disconnected", (E) => {
 
+            Debug.Log("disconnected -- " + E.data.ToString());
             string id = E.data["id"].ToString();
             id = RemoveQuotes(id);
 
             GameObject go = serverObjects[id].gameObject;
             Destroy(go); //Remove from game
             serverObjects.Remove(id); //Remove from memory
+            _vc.Remove(id); //Remove from memory
             otherPlayersPreviousPosX.Remove(id);
             otherPlayersPreviousPosY.Remove(id);
             otherPlayersPreviousPosZ.Remove(id);
         });
 
         On("updatePosition", (F) => {
-            // Debug.Log("F.Data :: "+F.data);
+            //Debug.Log("F.Data :: "+F.data);
             string id = F.data["id"].ToString();
             id = RemoveQuotes(id);
             // float x = F.data["position"]["x"].f;
             // float y = F.data["position"]["y"].f;
             // float z = F.data["position"]["z"].f;
-            
-            float x = F.data["pos"]["x"].f;
-            float y = F.data["pos"]["y"].f;
-            float z = F.data["pos"]["z"].f;
 
-            float rX = F.data["rot"]["x"].f;
-            float rY = F.data["rot"]["y"].f;
-            float rZ = F.data["rot"]["z"].f;
+
+
+            ////-----------------------------------------------
+            //float x = F.data["pos"]["x"].f;
+            //float y = F.data["pos"]["y"].f;
+            //float z = F.data["pos"]["z"].f;
+
+            //float rX = F.data["rot"]["x"].f;
+            //float rY = F.data["rot"]["y"].f;
+            //float rZ = F.data["rot"]["z"].f;
             // Debug.Log("x :: "+x);
 
             // Debug.Log("x ::: "+x+" , z :: "+z);
-            
 
-            NetworkIdentity ni = serverObjects[id];
-            // x = Mathf.Lerp(otherPlayersPreviousPosX[id],x,0.4f);
-            // y = Mathf.Lerp(otherPlayersPreviousPosY[id],y,0.4f);
-            // z = Mathf.Lerp(otherPlayersPreviousPosZ[id],z,0.4f);
-            ni.transform.position = new Vector3(x,y,z);
-            ni.transform.eulerAngles = new Vector3(rX,rY,rZ);
-            otherPlayersPreviousPosX[id] = x;
-            otherPlayersPreviousPosY[id] = y;
-            otherPlayersPreviousPosZ[id] = z;
+            //NetworkIdentity ni = serverObjects[id];
+            //// x = Mathf.Lerp(otherPlayersPreviousPosX[id],x,0.4f);
+            //// y = Mathf.Lerp(otherPlayersPreviousPosY[id],y,0.4f);
+            //// z = Mathf.Lerp(otherPlayersPreviousPosZ[id],z,0.4f);
+            //ni.transform.position = new Vector3(x,y,z);
+            //ni.transform.eulerAngles = new Vector3(rX,rY,rZ);
+            //otherPlayersPreviousPosX[id] = x;
+            //otherPlayersPreviousPosY[id] = y;
+            //otherPlayersPreviousPosZ[id] = z;
+            ////---------------------------------------------
+            ///
+
+            //Debug.Log("id == " + id);
+            _vc[id].GetMultiplayerValues(F.data["data"].ToString());
+
+
             // tempSendCount += 1;
             // Debug.Log("Player data is pushing! :: "+Time.time +", Temp count :: "+tempSendCount);
         });
@@ -419,6 +432,7 @@ public class NetworkClient : SocketIOComponent
         
         
         serverObjects.Add(id, ni);
+        _vc.Add(id, ni.GetComponent<VehicleControl>());
         otherPlayersPreviousPosX.Add(id,ni.transform.position.x);
         otherPlayersPreviousPosY.Add(id,ni.transform.position.y);
         otherPlayersPreviousPosZ.Add(id,ni.transform.position.z);

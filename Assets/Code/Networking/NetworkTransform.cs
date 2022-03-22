@@ -13,6 +13,8 @@ public class NetworkTransform : MonoBehaviour
     Details details = new Details();
     public float stillCounter = 0;
 
+    private VehicleControl _vc;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -67,12 +69,12 @@ public class NetworkTransform : MonoBehaviour
                 }
             }
             */
-            if(lastSyncTime + 0.05f + delayTime < Time.time)
-            {
-                lastSyncTime = Time.time;
-             //   delayTime = Random.Range (0.2f, 1.0f);
-                SendData();
-            }
+            //if(lastSyncTime + 0.05f + delayTime < Time.time)
+            //{
+            //    lastSyncTime = Time.time;
+            // //   delayTime = Random.Range (0.2f, 1.0f);
+            //    SendData();
+            //}
 
 
 
