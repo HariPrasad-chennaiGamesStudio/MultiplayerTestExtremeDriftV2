@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+	<base-config cleartextTrafficPermitted="false">
+		<trust-anchors>
+			<certificates src="system" />
+		</trust-anchors>
+	</base-config>
+
+	<domain-config cleartextTrafficPermitted="true">
+		<domain includeSubdomains="true">chennaigames.com</domain>
+		<domain includeSubdomains="true">mrracer.chennaigames.com</domain>
+		<domain includeSubdomains="true">google.com</domain>
+		<domain includeSubdomains="true">lh3.googleusercontent.com</domain>
+		<domain includeSubdomains="true">192.168.0.131</domain>
+		<domain includeSubdomains="true">192.168.0.116</domain>
+		<domain includeSubdomains="true">unity3d.com</domain>
+		<domain includeSubdomains="true">54.158.111.29</domain>
+		<domain includeSubdomains="true">192.168.14.138</domain>
+		<domain includeSubdomains="true">3.110.7.51</domain>
+	</domain-config>
+</network-security-config>

@@ -33,9 +33,10 @@ public class NetworkClient : SocketIOComponent
 
     public Dictionary<string, NetworkIdentity> serverObjects;
     public Dictionary<string, VehicleControl> _vc;
-    public Dictionary<string,float> otherPlayersPreviousPosX;
-    public Dictionary<string,float> otherPlayersPreviousPosY;
-    public Dictionary<string,float> otherPlayersPreviousPosZ;
+    private Dictionary<string,Placement> otherPlayersPlacement;
+    //public Dictionary<string,float> otherPlayersPreviousPosX;
+    //public Dictionary<string,float> otherPlayersPreviousPosY;
+    //public Dictionary<string,float> otherPlayersPreviousPosZ;
 
     
     
@@ -118,15 +119,45 @@ public class NetworkClient : SocketIOComponent
     {
         serverObjects = new Dictionary<string, NetworkIdentity>();
         _vc = new Dictionary<string, VehicleControl>();
-        otherPlayersPreviousPosX = new Dictionary<string, float>();
-        otherPlayersPreviousPosY = new Dictionary<string, float>();
-        otherPlayersPreviousPosZ = new Dictionary<string, float>();
+        otherPlayersPlacement = new Dictionary<string, Placement>();
+        //otherPlayersPreviousPosX = new Dictionary<string, float>();
+        //otherPlayersPreviousPosY = new Dictionary<string, float>();
+        //otherPlayersPreviousPosZ = new Dictionary<string, float>();
     }
 
+    private Vector3 tempVector3;
     // Update is called once per frame
     public override void Update()
     {
         base.Update();
+
+        foreach(var player in serverObjects)
+        {
+            if(player.Key != clientID)
+            {
+                //tempVector3 = transform.position;
+
+                //float speed = Math.Abs(tempVector3.x - otherPlayersPlacement[player.Key].p.x) / 0.1f;
+                //tempVector3.x = Mathf.Lerp(tempVector3.x, otherPlayersPlacement[player.Key].p.x, Time.deltaTime * speed);
+                //speed = Math.Abs(tempVector3.y - otherPlayersPlacement[player.Key].p.y) / 0.1f;
+                //tempVector3.y = Mathf.Lerp(tempVector3.y, otherPlayersPlacement[player.Key].p.y, Time.deltaTime * speed);
+                //speed = Math.Abs(tempVector3.z - otherPlayersPlacement[player.Key].p.z) / 0.1f;
+                //tempVector3.z = Mathf.Lerp(tempVector3.z, otherPlayersPlacement[player.Key].p.z, Time.deltaTime * speed);
+                //transform.position = tempVector3;
+
+                ////tempVector3 = transform.eulerAngles;
+                ////tempVector3.x = Mathf.Lerp(tempVector3.x, otherPlayersPlacement[player.Key].r.x, Time.deltaTime);
+                ////tempVector3.y = Mathf.Lerp(tempVector3.y, otherPlayersPlacement[player.Key].r.y, Time.deltaTime);
+                ////tempVector3.z = Mathf.Lerp(tempVector3.z, otherPlayersPlacement[player.Key].r.z, Time.deltaTime);
+                ////transform.eulerAngles = tempVector3;
+
+                //transform.eulerAngles = Vector3.Slerp(transform.eulerAngles, otherPlayersPlacement[player.Key].r, Time.deltaTime * speed);
+
+                transform.position = otherPlayersPlacement[player.Key].p;
+                transform.eulerAngles = otherPlayersPlacement[player.Key].r;
+            }
+        }
+
         // if(Input.GetKeyDown(KeyCode.G))
         // {
         //     StartCoroutine(TestWebREquest());
@@ -239,6 +270,8 @@ public class NetworkClient : SocketIOComponent
             JoinGame joinGameData = new JoinGame();
             joinGameData.name = playerName_Input.text;
             this.Emit("join",new JSONObject(JsonUtility.ToJson(joinGameData)));
+
+            RabbitMQController.instance.UpdateQueueName(clientID);
         });
         
         On("connect_error", (err) => {
@@ -267,42 +300,48 @@ public class NetworkClient : SocketIOComponent
             if(clientID == id)
             {
                 otherPlayersSpawning = false;
-                SpawnThePlayers(id);
+                SpawnThePlayers(id, userName);
             }else
             {
                 otherPlayersSpawning = true;
-                StartCoroutine("SpawnPlayersDelayed",id);
+                StartCoroutine(SpawnPlayersDelayed(id, userName));
             }
-            
-            
+
+
             // if(ni.IsControlling())
             // {
-                /*PlayerColor color = new PlayerColor();
+            /*PlayerColor color = new PlayerColor();
+
+            colorIndex = ni.GetRandomNumber(0,colors_Array.Length);
+            go.GetComponent<MeshRenderer>().material.color = colors_Array[colorIndex];
+            Color matColor = colors_Array[colorIndex];
+            color.r = matColor.r;
+            color.g = matColor.g;
+            color.b = matColor.b;
+            color.a = matColor.a;
+
+            ni.SetPlayerColor(color);
+
+            Player player = new Player();
+            player.id = id;
+            player.username = GameManager.instance.playerName;
+            player.color = ni.GetPlayerColor();
+            // player.color.g = ni.GetPlayerColor().g;
+            // player.color.b = ni.GetPlayerColor().b;
+            // player.color.a = ni.GetPlayerColor().a;
+            ni.SetPlayerName(userName);
+            // TextMeshPro playerId = go.GetComponentInChildren<TextMeshPro>();
+            // playerId.text = userName;
+            Debug.Log("adduser :: "+JsonUtility.ToJson(player));
+            ni.GetSocket().Emit("addUser",new JSONObject(JsonUtility.ToJson(player)));*/
+            // Debug.Break();
+            // }
             
-                colorIndex = ni.GetRandomNumber(0,colors_Array.Length);
-                go.GetComponent<MeshRenderer>().material.color = colors_Array[colorIndex];
-                Color matColor = colors_Array[colorIndex];
-                color.r = matColor.r;
-                color.g = matColor.g;
-                color.b = matColor.b;
-                color.a = matColor.a;
-
-                ni.SetPlayerColor(color);
-
-                Player player = new Player();
-                player.id = id;
-                player.username = GameManager.instance.playerName;
-                player.color = ni.GetPlayerColor();
-                // player.color.g = ni.GetPlayerColor().g;
-                // player.color.b = ni.GetPlayerColor().b;
-                // player.color.a = ni.GetPlayerColor().a;
-                ni.SetPlayerName(userName);
-                // TextMeshPro playerId = go.GetComponentInChildren<TextMeshPro>();
-                // playerId.text = userName;
-                Debug.Log("adduser :: "+JsonUtility.ToJson(player));
-                ni.GetSocket().Emit("addUser",new JSONObject(JsonUtility.ToJson(player)));*/
-                // Debug.Break();
-            // }            
+            if (clientID == id)
+            {
+                RabbitMQController.instance.UpdateExchangeKeyAndCreateQueue(RemoveQuotes(E.data["roomid"].ToString()));
+                //playerControlPanel.SetActive(true);
+            }
         });
 
         On("applycolor", (E) => {
@@ -324,9 +363,10 @@ public class NetworkClient : SocketIOComponent
             Destroy(go); //Remove from game
             serverObjects.Remove(id); //Remove from memory
             _vc.Remove(id); //Remove from memory
-            otherPlayersPreviousPosX.Remove(id);
-            otherPlayersPreviousPosY.Remove(id);
-            otherPlayersPreviousPosZ.Remove(id);
+            otherPlayersPlacement.Remove(id);
+            //otherPlayersPreviousPosX.Remove(id);
+            //otherPlayersPreviousPosY.Remove(id);
+            //otherPlayersPreviousPosZ.Remove(id);
         });
 
         On("updatePosition", (F) => {
@@ -364,11 +404,13 @@ public class NetworkClient : SocketIOComponent
             ///
 
             //Debug.Log("id == " + id);
-            _vc[id].GetMultiplayerValues(F.data["data"].ToString());
+            //_vc[id].GetMultiplayerValues(F.data["data"].ToString());
 
 
             // tempSendCount += 1;
             // Debug.Log("Player data is pushing! :: "+Time.time +", Temp count :: "+tempSendCount);
+
+            UpdatePosition(id, F.data["data"].ToString());
         });
 
         On("updateText",(T) =>
@@ -382,6 +424,31 @@ public class NetworkClient : SocketIOComponent
         });
 
     }
+
+    private struct Placement
+    {
+        public Vector3 p;
+        public Vector3 r;
+    }
+
+    public void UpdatePosition(string id, string _json)
+    {
+        if(id != clientID && otherPlayersPlacement.ContainsKey(id))
+        {
+            Debug.Log("Received Json == " + _json);
+            otherPlayersPlacement[id] = JsonUtility.FromJson<Placement>(_json);
+        }
+    }
+
+    public string _sendJson()
+    {
+        var p = new Placement();
+        p.p = serverObjects[clientID].transform.position;
+        p.r = serverObjects[clientID].transform.eulerAngles;
+
+        return JsonUtility.ToJson(p);
+    }
+
     private int tempSendCount = 0;
     private string sendMessageText;
     public void UpdateTypedMessage()
@@ -417,8 +484,9 @@ public class NetworkClient : SocketIOComponent
         Debug.Log("Player name :: "+GameManager.instance.playerName);
     }
 
-    private void SpawnThePlayers(string id)
+    private void SpawnThePlayers(string id, string userName)
     {
+        Debug.Log("SpawnThePlayers -- " + id);
         // GameObject go = new GameObject("Server ID : "+ id);
         GameObject go = Instantiate(playerObject_GO, new Vector3(spawnedXPos,spawnedYPos,spawnedZPos),Quaternion.identity);
         // spawnedXPos += 10.0f; 
@@ -428,20 +496,26 @@ public class NetworkClient : SocketIOComponent
         go.transform.SetParent(networkContainer);
         NetworkIdentity ni = go.GetComponent<NetworkIdentity>();
         ni.SetControllerID(id);
+        ni.SetPlayerName(userName);
         ni.SetTheSocketReference(this);
         
         
         serverObjects.Add(id, ni);
         _vc.Add(id, ni.GetComponent<VehicleControl>());
-        otherPlayersPreviousPosX.Add(id,ni.transform.position.x);
-        otherPlayersPreviousPosY.Add(id,ni.transform.position.y);
-        otherPlayersPreviousPosZ.Add(id,ni.transform.position.z);
+        var placement = new Placement();
+        placement.p = ni.transform.position;
+        placement.r = ni.transform.eulerAngles;
+        otherPlayersPlacement.Add(id, placement);
+
+        //otherPlayersPreviousPosX.Add(id,ni.transform.position.x);
+        //otherPlayersPreviousPosY.Add(id,ni.transform.position.y);
+        //otherPlayersPreviousPosZ.Add(id,ni.transform.position.z);
     }
 
-    private IEnumerator SpawnPlayersDelayed(string id)
+    private IEnumerator SpawnPlayersDelayed(string id, string userName)
     {
         yield return new WaitForSeconds(3.0f);
-        SpawnThePlayers(id);
+        SpawnThePlayers(id, userName);
     }
 
     

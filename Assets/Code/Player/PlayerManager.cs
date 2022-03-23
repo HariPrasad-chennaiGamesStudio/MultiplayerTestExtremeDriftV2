@@ -51,19 +51,19 @@ public class PlayerManager : MonoBehaviour
 
     private void UpdateMovementForNetworkOpponent()
     {
-            // x = Mathf.Lerp(otherPlayersPreviousPosX[id],x,0.4f);
-            // y = Mathf.Lerp(otherPlayersPreviousPosY[id],y,0.4f);
-            // z = Mathf.Lerp(otherPlayersPreviousPosZ[id],z,0.4f);
-            // ni.transform.position = new Vector3(x,y,z);
+        // x = Mathf.Lerp(otherPlayersPreviousPosX[id],x,0.4f);
+        // y = Mathf.Lerp(otherPlayersPreviousPosY[id],y,0.4f);
+        // z = Mathf.Lerp(otherPlayersPreviousPosZ[id],z,0.4f);
+        // ni.transform.position = new Vector3(x,y,z);
 
         // transform.position = new Vector3 (NetworkClient.instance.otherPlayersPreviousPosX[thisPlayerNetworkId], 
         // NetworkClient.instance.otherPlayersPreviousPosY[thisPlayerNetworkId],
         // NetworkClient.instance.otherPlayersPreviousPosZ[thisPlayerNetworkId]);
 
-        x = Mathf.Lerp(transform.position.x, NetworkClient.instance.otherPlayersPreviousPosX[thisPlayerNetworkId], 0.1f);
-        y = Mathf.Lerp(transform.position.y, NetworkClient.instance.otherPlayersPreviousPosY[thisPlayerNetworkId], 0.1f);
-        z = Mathf.Lerp(transform.position.z, NetworkClient.instance.otherPlayersPreviousPosZ[thisPlayerNetworkId], 0.1f);
-        transform.position = new Vector3(x,y,z);
+        //x = Mathf.Lerp(transform.position.x, NetworkClient.instance.otherPlayersPreviousPosX[thisPlayerNetworkId], 0.1f);
+        //y = Mathf.Lerp(transform.position.y, NetworkClient.instance.otherPlayersPreviousPosY[thisPlayerNetworkId], 0.1f);
+        //z = Mathf.Lerp(transform.position.z, NetworkClient.instance.otherPlayersPreviousPosZ[thisPlayerNetworkId], 0.1f);
+        //transform.position = new Vector3(x,y,z);
     }
 
 
