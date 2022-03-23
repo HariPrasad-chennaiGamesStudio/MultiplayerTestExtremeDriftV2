@@ -497,12 +497,22 @@ public class VehicleControl : MonoBehaviour
         // if (GameUI.manage.gameFinished)
         //     vehicleMode = VehicleMode.AICar;
 
-        if (!isMultiplayerAI && !carSetting.automaticGear)
+        if (!isMultiplayerAI)
         {
-            if (Input.GetKeyDown("page up"))
-                ShiftUp();
-            if (Input.GetKeyDown("page down"))
-                ShiftDown();
+            if (!carSetting.automaticGear)
+            {
+                if (Input.GetKeyDown("page up"))
+                    ShiftUp();
+                if (Input.GetKeyDown("page down"))
+                    ShiftDown();
+            }
+
+            if (lastSyncedTime + 0.1f < Time.time)
+            {
+                lastSyncedTime = Time.time;
+
+                SendData();
+            }
         }
 
         // if (vehicleMode == VehicleMode.Player /*&& GameUI.manage.gameStarted*/)
@@ -557,131 +567,140 @@ public class VehicleControl : MonoBehaviour
    
     private void SendData()
     {
-        string _json = JsonUtility.ToJson(_m_Data);
+        //string _json = JsonUtility.ToJson(_m_Data);
         //Debug.Log("Send Data == " + _json);
-        networkIdentity.GetSocket().Emit("updatePosition", new JSONObject(_json));
+        //networkIdentity.GetSocket().Emit("updatePosition", new JSONObject(NetworkClient.instance._sendJson()));
 
         //GetMultiplayerValues(_json);
+
+        RabbitMQController.instance.SendMessageInQueue(NetworkClient.instance._sendJson());
     }
 
     void FixedUpdate()
     {
-        if (!isMultiplayerAI && lastSyncedTime/* + 0.1f*/ < Time.time)
+        if(isMultiplayerAI)
         {
-            lastSyncedTime = Time.time;
-            // speed of car
-            _m_Data.m_speed = myRigidbody.velocity.magnitude * 2.7f;
-            // Debug.Log("speed :: "+speed);
-            if (_m_Data.m_speed < lastSpeed - 10 && slip < 10)
+            return;
+        }
+
+        // speed of car
+        _m_Data.m_speed = myRigidbody.velocity.magnitude * 2.7f;
+        // Debug.Log("speed :: "+speed);
+        if (_m_Data.m_speed < lastSpeed - 10 && slip < 10)
+        {
+            _m_Data.m_slip = lastSpeed / 15;
+        }
+
+        lastSpeed = _m_Data.m_speed;
+
+        if (_m_Data.m_slip2 != 0.0f)
+        {
+            // Debug.Log("slip2 :: "+slip2);
+            // Debug.Break();
+            _m_Data.m_slip2 = Mathf.MoveTowards(_m_Data.m_slip2, 0.0f, 0.1f);
+        }
+
+
+        myRigidbody.centerOfMass = carSetting.shiftCentre;
+
+
+        if (vehicleMode == VehicleMode.Player /*&& GameUI.manage.gameStarted*/)
+        {
+            if (AIControl.manage.controlMode == ControlMode.Simple)
             {
-                _m_Data.m_slip = lastSpeed / 15;
+                // if(mobileControl == false)
+                // {
+                _m_Data.m_accel = 0;
+                _m_Data.m_brake = false;
+                _m_Data.m_shift = false;
+
+                if (carWheels.wheels.frontWheelDrive || carWheels.wheels.backWheelDrive)
+                {
+                    _m_Data.m_steer = Input.GetAxis("Horizontal");
+                    _m_Data.m_accel = Input.GetAxis("Vertical");
+                    _m_Data.m_brake = Input.GetButton("Jump");
+                    _m_Data.m_shift = Input.GetKey(KeyCode.LeftShift) | Input.GetKey(KeyCode.RightShift);
+                }
+
+                if (!carSetting.automaticGear)
+                {
+                    if (Input.GetKeyDown("page up"))
+                    {
+                        ShiftUp();
+                    }
+                    if (Input.GetKeyDown("page down"))
+                    {
+                        ShiftDown();
+                    }
+                }
             }
 
-            lastSpeed = _m_Data.m_speed;
 
-            if (_m_Data.m_slip2 != 0.0f)
+
+            // }
+            else if (AIControl.manage.controlMode == ControlMode.Mobile)
             {
-                // Debug.Log("slip2 :: "+slip2);
-                // Debug.Break();
-                _m_Data.m_slip2 = Mathf.MoveTowards(_m_Data.m_slip2, 0.0f, 0.1f);
+                // else
+                // {
+                if (accelFwd != 0) { accel = accelFwd; } else { accel = accelBack; }
+
+                // if (GameUI.manage.panels.gamePlay.buttonsUI.activeSelf)
+                // {
+                steer = Mathf.MoveTowards(steer, steerAmount, 0.1f);
+                // }
+                // else if (GameUI.manage.panels.gamePlay.accelUI.activeSelf)
+                // {
+                // steer = Mathf.MoveTowards(steer, Input.acceleration.x * 2.0f, 0.4f);
+
+                // }
+                // }
+
             }
 
+        }
+        else if (vehicleMode == VehicleMode.AICar && GameUI.manage.gameStarted)
+        {
+            shift = false;
 
-            myRigidbody.centerOfMass = carSetting.shiftCentre;
+
+            if (!GameUI.manage.gameFinished)
+                vehicleMode = VehicleMode.Player;
 
 
-            if (vehicleMode == VehicleMode.Player /*&& GameUI.manage.gameStarted*/)
+            steer = AIVehicle.AISteer;
+            accel = AIVehicle.AIAccel;
+            brake = AIVehicle.AIBrake;
+        }
+        else
+        {
+
+            steer = 0;
+            shift = false;
+
+            if (vehicleMode == VehicleMode.Player)
             {
                 if (AIControl.manage.controlMode == ControlMode.Simple)
                 {
-                    // if(mobileControl == false)
-                    // {
-                    _m_Data.m_accel = 0;
-                    _m_Data.m_brake = false;
-                    _m_Data.m_shift = false;
-
-                    if (carWheels.wheels.frontWheelDrive || carWheels.wheels.backWheelDrive)
-                    {
-                        _m_Data.m_steer = Input.GetAxis("Horizontal");
-                        _m_Data.m_accel = Input.GetAxis("Vertical");
-                        _m_Data.m_brake = Input.GetButton("Jump");
-                        _m_Data.m_shift = Input.GetKey(KeyCode.LeftShift) | Input.GetKey(KeyCode.RightShift);
-                    }
-
-                    if (!carSetting.automaticGear)
-                    {
-                        if (Input.GetKeyDown("page up"))
-                        {
-                            ShiftUp();
-                        }
-                        if (Input.GetKeyDown("page down"))
-                        {
-                            ShiftDown();
-                        }
-                    }
-                }
-
-
-
-                // }
-                else if (AIControl.manage.controlMode == ControlMode.Mobile)
-                {
-                    // else
-                    // {
-                    if (accelFwd != 0) { accel = accelFwd; } else { accel = accelBack; }
-
-                    // if (GameUI.manage.panels.gamePlay.buttonsUI.activeSelf)
-                    // {
-                    steer = Mathf.MoveTowards(steer, steerAmount, 0.1f);
-                    // }
-                    // else if (GameUI.manage.panels.gamePlay.accelUI.activeSelf)
-                    // {
-                    // steer = Mathf.MoveTowards(steer, Input.acceleration.x * 2.0f, 0.4f);
-
-                    // }
-                    // }
-
-                }
-
-            }
-            else if (vehicleMode == VehicleMode.AICar && GameUI.manage.gameStarted)
-            {
-                shift = false;
-
-
-                if (!GameUI.manage.gameFinished)
-                    vehicleMode = VehicleMode.Player;
-
-
-                steer = AIVehicle.AISteer;
-                accel = AIVehicle.AIAccel;
-                brake = AIVehicle.AIBrake;
-            }
-            else
-            {
-
-                steer = 0;
-                shift = false;
-
-                if (vehicleMode == VehicleMode.Player)
-                {
-                    if (AIControl.manage.controlMode == ControlMode.Simple)
-                    {
-                        accel = Input.GetAxis("Vertical");
-                    }
-                    else
-                    {
-                        accel = accelFwd;
-                    }
+                    accel = Input.GetAxis("Vertical");
                 }
                 else
                 {
-                    accel = 1.0f;
+                    accel = accelFwd;
                 }
             }
-
-            SendData();
+            else
+            {
+                accel = 1.0f;
+            }
         }
+
+        speed = _m_Data.m_speed;
+        steer = _m_Data.m_steer;
+        accel = _m_Data.m_accel;
+        brake = _m_Data.m_brake;
+        shift = _m_Data.m_shift;
+        slip = _m_Data.m_slip;
+        slip2 = _m_Data.m_slip2;
 
         if (!carWheels.wheels.frontWheelDrive && !carWheels.wheels.backWheelDrive)
             accel = 0.0f;

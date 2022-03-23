@@ -27,7 +27,8 @@ public class NetworkTransform : MonoBehaviour
         // playerDetails.pos.y = 0.0f;
         // playerDetails.pos.z = 0.0f;
         TextMeshPro playerId = GetComponentInChildren<TextMeshPro>();
-        playerId.text = networkIdentity.GetID();
+        playerId.text = networkIdentity.GetName();
+        playerId.transform.localEulerAngles = Vector3.zero;
 
         lastSyncTime = Time.time;
 
