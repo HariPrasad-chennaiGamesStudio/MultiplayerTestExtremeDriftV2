@@ -10,6 +10,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using TMPro;
 using System;
+using Newtonsoft.Json;
+using System.Text;
 
 public class NetworkClient : SocketIOComponent
 {
@@ -32,14 +34,15 @@ public class NetworkClient : SocketIOComponent
     private Transform networkContainer;
 
     public Dictionary<string, NetworkIdentity> serverObjects;
-    public Dictionary<string, VehicleControl> _vc;
-    private Dictionary<string,Placement> otherPlayersPlacement;
+    //public Dictionary<string, VehicleControl> _vc;
+    private Dictionary<string,MultiplayerPlayersPlacement> otherPlayersPlacement;
+    private Dictionary<string,float> hardCodeDelayTime;
     //public Dictionary<string,float> otherPlayersPreviousPosX;
     //public Dictionary<string,float> otherPlayersPreviousPosY;
     //public Dictionary<string,float> otherPlayersPreviousPosZ;
 
-    
-    
+
+
 
     public GameObject playerObject_GO;
 
@@ -84,6 +87,10 @@ public class NetworkClient : SocketIOComponent
         // playerControlPanel.SetActive(false);
         connectPanel.SetActive(true);
         GameManager.instance.currentScene = GameManager.Scenes.Garage;
+
+        p = new MultiplayerPlayersPlacement();
+        p.p = new Positions();
+        p.r = new Positions();
     }
 
     private string BytesToString(byte[] bytes)
@@ -118,43 +125,68 @@ public class NetworkClient : SocketIOComponent
     private void Initialize()
     {
         serverObjects = new Dictionary<string, NetworkIdentity>();
-        _vc = new Dictionary<string, VehicleControl>();
-        otherPlayersPlacement = new Dictionary<string, Placement>();
+        //_vc = new Dictionary<string, VehicleControl>();
+        otherPlayersPlacement = new Dictionary<string, MultiplayerPlayersPlacement>();
+        hardCodeDelayTime = new Dictionary<string, float>();
         //otherPlayersPreviousPosX = new Dictionary<string, float>();
         //otherPlayersPreviousPosY = new Dictionary<string, float>();
         //otherPlayersPreviousPosZ = new Dictionary<string, float>();
     }
 
     private Vector3 tempVector3;
+    private Quaternion _tempQuaternion;
     // Update is called once per frame
     public override void Update()
     {
         base.Update();
 
-        foreach(var player in serverObjects)
+        foreach (var player in otherPlayersPlacement)
         {
-            if(player.Key != clientID)
+            if (player.Key != clientID)
             {
-                //tempVector3 = transform.position;
+                if (hardCodeDelayTime[player.Key] > 3f)
+                {
+                    float moveTime = 0.5f;
+                    tempVector3 = serverObjects[player.Key].transform.position;
+                    float speed = Math.Abs(tempVector3.x - otherPlayersPlacement[player.Key].p.x) / moveTime;
+                    tempVector3.x = Mathf.Lerp(tempVector3.x, otherPlayersPlacement[player.Key].p.x, Time.deltaTime * speed);
+                    speed = Math.Abs(tempVector3.y - otherPlayersPlacement[player.Key].p.y) / moveTime;
+                    tempVector3.y = Mathf.Lerp(tempVector3.y, otherPlayersPlacement[player.Key].p.y, Time.deltaTime * speed);
+                    speed = Math.Abs(tempVector3.z - otherPlayersPlacement[player.Key].p.z) / moveTime;
+                    tempVector3.z = Mathf.Lerp(tempVector3.z, otherPlayersPlacement[player.Key].p.z, Time.deltaTime * speed);
+                    serverObjects[player.Key].transform.position = tempVector3;
 
-                //float speed = Math.Abs(tempVector3.x - otherPlayersPlacement[player.Key].p.x) / 0.1f;
-                //tempVector3.x = Mathf.Lerp(tempVector3.x, otherPlayersPlacement[player.Key].p.x, Time.deltaTime * speed);
-                //speed = Math.Abs(tempVector3.y - otherPlayersPlacement[player.Key].p.y) / 0.1f;
-                //tempVector3.y = Mathf.Lerp(tempVector3.y, otherPlayersPlacement[player.Key].p.y, Time.deltaTime * speed);
-                //speed = Math.Abs(tempVector3.z - otherPlayersPlacement[player.Key].p.z) / 0.1f;
-                //tempVector3.z = Mathf.Lerp(tempVector3.z, otherPlayersPlacement[player.Key].p.z, Time.deltaTime * speed);
-                //transform.position = tempVector3;
+                    //tempVector3 = serverObjects[player.Key].transform.eulerAngles;
 
-                ////tempVector3 = transform.eulerAngles;
-                ////tempVector3.x = Mathf.Lerp(tempVector3.x, otherPlayersPlacement[player.Key].r.x, Time.deltaTime);
-                ////tempVector3.y = Mathf.Lerp(tempVector3.y, otherPlayersPlacement[player.Key].r.y, Time.deltaTime);
-                ////tempVector3.z = Mathf.Lerp(tempVector3.z, otherPlayersPlacement[player.Key].r.z, Time.deltaTime);
-                ////transform.eulerAngles = tempVector3;
+                    //tempVector3.x = Mathf.Lerp(tempVector3.x, otherPlayersPlacement[player.Key].r.x, 0.2f);
+                    //tempVector3.y = Mathf.Lerp(tempVector3.y, otherPlayersPlacement[player.Key].r.y, 0.2f);
+                    //tempVector3.z = Mathf.Lerp(tempVector3.z, otherPlayersPlacement[player.Key].r.z, 0.2f);
+                    //serverObjects[player.Key].transform.eulerAngles = tempVector3;
 
-                //transform.eulerAngles = Vector3.Slerp(transform.eulerAngles, otherPlayersPlacement[player.Key].r, Time.deltaTime * speed);
+                    tempVector3.x = otherPlayersPlacement[player.Key].r.x;
+                    tempVector3.y = otherPlayersPlacement[player.Key].r.y;
+                    tempVector3.z = otherPlayersPlacement[player.Key].r.z;
+                    ////serverObjects[player.Key].transform.eulerAngles = tempVector3;
+                    //serverObjects[player.Key].transform.eulerAngles = Vector3.Slerp(serverObjects[player.Key].transform.eulerAngles, tempVector3, Time.deltaTime * speed);
 
-                transform.position = otherPlayersPlacement[player.Key].p;
-                transform.eulerAngles = otherPlayersPlacement[player.Key].r;
+                    _tempQuaternion = Quaternion.Euler(tempVector3);
+                    serverObjects[player.Key].transform.rotation = Quaternion.Lerp(serverObjects[player.Key].transform.rotation, _tempQuaternion, Time.deltaTime * speed);
+
+                    //tempVector3.x = otherPlayersPlacement[player.Key].p.x;
+                    //tempVector3.y = otherPlayersPlacement[player.Key].p.y;
+                    //tempVector3.z = otherPlayersPlacement[player.Key].p.z;
+                    //Debug.Log(tempVector3);
+                    //serverObjects[player.Key].transform.position = tempVector3;
+
+                    //serverObjects[player.Key].transform.eulerAngles = otherPlayersPlacement[player.Key].r;
+                }
+                else
+                {
+                    hardCodeDelayTime[player.Key] += Time.deltaTime;
+                    otherPlayersPlacement[player.Key].p.x = serverObjects[player.Key].transform.position.x;
+                    otherPlayersPlacement[player.Key].p.y = serverObjects[player.Key].transform.position.y;
+                    otherPlayersPlacement[player.Key].p.z = serverObjects[player.Key].transform.position.z;
+                }
             }
         }
 
@@ -164,10 +196,10 @@ public class NetworkClient : SocketIOComponent
         // }
 
         //For testing purpose only...
-        ChangeTheSceneName();
-        DisconnectFromTheServer();
-        TestingConnectToTheServer();
-        CheckConnectionStatus();
+        //ChangeTheSceneName();
+        //DisconnectFromTheServer();
+        //TestingConnectToTheServer();
+        //CheckConnectionStatus();
     }
 
     private bool garagScene = false;
@@ -292,19 +324,23 @@ public class NetworkClient : SocketIOComponent
             Debug.Log("E.Data :: "+E.data);
             string id = E.data["i"].ToString();
             string userName = E.data["name"].ToString();
-            spawnedXPos = E.data["x"].f;
-            spawnedYPos = E.data["y"].f;
-            spawnedZPos = E.data["z"].f;
+            //spawnedXPos = E.data["x"].f;
+            //spawnedYPos = E.data["y"].f;
+            //spawnedZPos = E.data["z"].f;
             userName = RemoveQuotes(userName);
             id = RemoveQuotes(id);
-            if(clientID == id)
+
+            string index = RemoveQuotes(E.data["index"].ToString());
+
+            Debug.Log("players orderindex == " + index);
+            if (clientID == id)
             {
-                otherPlayersSpawning = false;
-                SpawnThePlayers(id, userName);
+                //otherPlayersSpawning = false;
+                SpawnThePlayers(id, userName, int.Parse(index));
             }else
             {
-                otherPlayersSpawning = true;
-                StartCoroutine(SpawnPlayersDelayed(id, userName));
+                //otherPlayersSpawning = true;
+                StartCoroutine(SpawnPlayersDelayed(id, userName, int.Parse(index)));
             }
 
 
@@ -362,14 +398,15 @@ public class NetworkClient : SocketIOComponent
             GameObject go = serverObjects[id].gameObject;
             Destroy(go); //Remove from game
             serverObjects.Remove(id); //Remove from memory
-            _vc.Remove(id); //Remove from memory
+            //_vc.Remove(id); //Remove from memory
             otherPlayersPlacement.Remove(id);
+            hardCodeDelayTime.Remove(id);
             //otherPlayersPreviousPosX.Remove(id);
             //otherPlayersPreviousPosY.Remove(id);
             //otherPlayersPreviousPosZ.Remove(id);
         });
 
-        On("updatePosition", (F) => {
+        /*On("updatePosition", (F) => {
             //Debug.Log("F.Data :: "+F.data);
             string id = F.data["id"].ToString();
             id = RemoveQuotes(id);
@@ -410,8 +447,9 @@ public class NetworkClient : SocketIOComponent
             // tempSendCount += 1;
             // Debug.Log("Player data is pushing! :: "+Time.time +", Temp count :: "+tempSendCount);
 
-            UpdatePosition(id, F.data["data"].ToString());
+            //UpdatePosition(id, F.data["data"].ToString());
         });
+        */
 
         On("updateText",(T) =>
         {
@@ -425,28 +463,98 @@ public class NetworkClient : SocketIOComponent
 
     }
 
-    private struct Placement
-    {
-        public Vector3 p;
-        public Vector3 r;
-    }
-
-    public void UpdatePosition(string id, string _json)
+    public void UpdatePosition(string id, MultiplayerPlayersPlacement _data)
     {
         if(id != clientID && otherPlayersPlacement.ContainsKey(id))
         {
-            Debug.Log("Received Json == " + _json);
-            otherPlayersPlacement[id] = JsonUtility.FromJson<Placement>(_json);
+            Debug.Log("Consumed Message = " + _data.p.x + " " + _data.p.y + _data.p.z);
+            //otherPlayersPlacement[id] = JsonConvert.DeserializeObject<MultiplayerPlayersPlacement>(_json);
+            otherPlayersPlacement[id] = _data;
+            _data = null;
         }
     }
 
-    public string _sendJson()
+    public void UpdatePosition(string[] _data)
     {
-        var p = new Placement();
-        p.p = serverObjects[clientID].transform.position;
-        p.r = serverObjects[clientID].transform.eulerAngles;
+        
+        if (_data[0] != clientID && otherPlayersPlacement.ContainsKey(_data[0]))
+        {
+            Debug.Log("Consumed Message = " + _data[0] + " " + _data[1] + " " + _data[2]);
+            //otherPlayersPlacement[id] = JsonConvert.DeserializeObject<MultiplayerPlayersPlacement>(_json);
 
-        return JsonUtility.ToJson(p);
+
+            //p.id = _data[0];
+
+            //var _data2 = _data[1].Split(',');
+
+            //p.p.x = float.Parse(_data2[0]);
+            //p.p.y = float.Parse(_data2[1]);
+            //p.p.z = float.Parse(_data2[2]);
+
+            //Debug.Log("Consumed Message POS = " + _data2[0] + " " + _data2[1] + " " + _data2[2]);
+
+            //_data2 = _data[2].Split(',');
+
+            //p.r.x = float.Parse(_data2[0]);
+            //p.r.y = float.Parse(_data2[1]);
+            //p.r.z = float.Parse(_data2[2]);
+
+            //Debug.Log("Consumed Message ROT = " + _data2[0] + " " + _data2[1] + " " + _data2[2]);
+
+            var pData = otherPlayersPlacement[_data[0]];
+
+            var _data2 = _data[1].Split(',');
+            pData.p.x = float.Parse(_data2[0]);
+            pData.p.y = float.Parse(_data2[1]);
+            pData.p.z = float.Parse(_data2[2]);
+
+            _data2 = null;
+
+            _data2 = _data[2].Split(',');
+            pData.r.x = float.Parse(_data2[0]);
+            pData.r.y = float.Parse(_data2[1]);
+            pData.r.z = float.Parse(_data2[2]);
+
+            Debug.Log(otherPlayersPlacement[_data[0]].p.x + " -- " + otherPlayersPlacement[_data[0]].p.y + " -- " + otherPlayersPlacement[_data[0]].p.z);
+
+            _data = null;
+            _data2 = null;
+        }
+    }
+
+    private MultiplayerPlayersPlacement p;
+    private StringBuilder _sb = new StringBuilder();
+    public void _sendJson()
+    {
+        p.id = clientID;
+        tempVector3 = serverObjects[clientID].transform.position;
+
+        p.p.x = (int)(tempVector3.x * 1000f) / 1000f;
+        p.p.y = (int)(tempVector3.y * 1000f) / 1000f;
+        p.p.z = (int)(tempVector3.z * 1000f) / 1000f;
+
+        tempVector3 = serverObjects[clientID].transform.eulerAngles;
+        p.r.x = (int)(tempVector3.x * 1000f) / 1000f;
+        p.r.y = (int)(tempVector3.y * 1000f) / 1000f;
+        p.r.z = (int)(tempVector3.z * 1000f) / 1000f;
+
+        //RabbitMQController.instance.SendMessageInQueue(p);
+
+        _sb.Clear();
+        _sb.Append(p.id);
+        _sb.Append('|');
+        _sb.Append(p.p.x);
+        _sb.Append(',');
+        _sb.Append(p.p.y);
+        _sb.Append(',');
+        _sb.Append(p.p.z);
+        _sb.Append('|');
+        _sb.Append(p.r.x);
+        _sb.Append(',');
+        _sb.Append(p.r.y);
+        _sb.Append(',');
+        _sb.Append(p.r.z);
+        RabbitMQController.instance.SendMessageInQueue(_sb.ToString());
     }
 
     private int tempSendCount = 0;
@@ -484,11 +592,38 @@ public class NetworkClient : SocketIOComponent
         Debug.Log("Player name :: "+GameManager.instance.playerName);
     }
 
-    private void SpawnThePlayers(string id, string userName)
+    //[ContextMenu("TEST")]
+    //private void Test()
+    //{
+    //    for (int i = 0; i < 100; i++)
+    //    {
+    //        tempVector3.x = -140f + ((i % 5) * 5);
+    //        tempVector3.y = 0f;
+    //        tempVector3.z = 0f + ((i / 5) * 5);
+
+    //        Debug.Log(i + " -- " + tempVector3);
+    //    }
+    //}
+
+    private void SpawnThePlayers(string id, string userName, int index)
     {
+        if (clientID == id)
+        {
+            otherPlayersSpawning = false;
+        }
+        else
+        {
+            otherPlayersSpawning = true;
+        }
         Debug.Log("SpawnThePlayers -- " + id);
+
+        tempVector3.x = -140f + ((index % 5) * 5);
+        tempVector3.y = 0f;
+        tempVector3.z = 0f + ((index / 5) * 5);
+
         // GameObject go = new GameObject("Server ID : "+ id);
-        GameObject go = Instantiate(playerObject_GO, new Vector3(spawnedXPos,spawnedYPos,spawnedZPos),Quaternion.identity);
+        //GameObject go = Instantiate(playerObject_GO, new Vector3(spawnedXPos,spawnedYPos,spawnedZPos),Quaternion.identity);
+        GameObject go = Instantiate(playerObject_GO, new Vector3(tempVector3.x, tempVector3.y, tempVector3.z),Quaternion.identity);
         // spawnedXPos += 10.0f; 
         Debug.Log("Server spawned objects x position :: "+spawnedXPos+" , "+Time.time);
         go.name = string.Format("Player ({0})",id);//id);//"Server ID : "+ id;
@@ -501,10 +636,26 @@ public class NetworkClient : SocketIOComponent
         
         
         serverObjects.Add(id, ni);
-        _vc.Add(id, ni.GetComponent<VehicleControl>());
-        var placement = new Placement();
-        placement.p = ni.transform.position;
-        placement.r = ni.transform.eulerAngles;
+        //_vc.Add(id, ni.GetComponent<VehicleControl>());
+
+        var placement = new MultiplayerPlayersPlacement();
+        placement.id = id;
+        placement.p = new Positions();
+        placement.r = new Positions();
+
+        tempVector3 = ni.transform.position;
+
+        placement.p.x = tempVector3.x;
+        placement.p.y = tempVector3.y;
+        placement.p.z = tempVector3.z;
+
+
+        tempVector3 = ni.transform.eulerAngles;
+
+        placement.r.x = tempVector3.x;
+        placement.r.y = tempVector3.y;
+        placement.r.z = tempVector3.z;
+        hardCodeDelayTime.Add(id, 0f);
         otherPlayersPlacement.Add(id, placement);
 
         //otherPlayersPreviousPosX.Add(id,ni.transform.position.x);
@@ -512,10 +663,10 @@ public class NetworkClient : SocketIOComponent
         //otherPlayersPreviousPosZ.Add(id,ni.transform.position.z);
     }
 
-    private IEnumerator SpawnPlayersDelayed(string id, string userName)
+    private IEnumerator SpawnPlayersDelayed(string id, string userName, int index)
     {
         yield return new WaitForSeconds(3.0f);
-        SpawnThePlayers(id, userName);
+        SpawnThePlayers(id, userName, index);
     }
 
     
@@ -524,4 +675,12 @@ public class NetworkClient : SocketIOComponent
        idString = idString.Replace('"', ' ').Trim();
        return idString;
     }
+}
+
+[System.Serializable]
+public class MultiplayerPlayersPlacement
+{
+    public string id;
+    public Positions p;
+    public Positions r;
 }

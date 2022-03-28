@@ -380,7 +380,7 @@ public class VehicleControl : MonoBehaviour
         if(NetworkClient.instance.otherPlayersSpawning == true)
         {
             // Destroy(GetComponent<Rigidbody>());
-            //Destroy(this);
+            Destroy(this);
 
             isMultiplayerAI = true;
             return;
@@ -474,11 +474,11 @@ public class VehicleControl : MonoBehaviour
         }
 
 
-#if UNITY_ANDROID||UNITY_IOS
+//#if UNITY_ANDROID||UNITY_IOS
 
-        if (PlayerPrefs.GetInt("VibrationActive") == 0)
-            Handheld.Vibrate();
-#endif
+//        if (PlayerPrefs.GetInt("VibrationActive") == 0)
+//            Handheld.Vibrate();
+//#endif
     }
 
 
@@ -511,7 +511,9 @@ public class VehicleControl : MonoBehaviour
             {
                 lastSyncedTime = Time.time;
 
-                SendData();
+                //SendData();
+
+                NetworkClient.instance._sendJson();
             }
         }
 
@@ -565,16 +567,16 @@ public class VehicleControl : MonoBehaviour
         slip2 = _m_Data.m_slip2;
     }
    
-    private void SendData()
-    {
-        //string _json = JsonUtility.ToJson(_m_Data);
-        //Debug.Log("Send Data == " + _json);
-        //networkIdentity.GetSocket().Emit("updatePosition", new JSONObject(NetworkClient.instance._sendJson()));
+    //private void SendData()
+    //{
+    //    //string _json = JsonUtility.ToJson(_m_Data);
+    //    //Debug.Log("Send Data == " + _json);
+    //    //networkIdentity.GetSocket().Emit("updatePosition", new JSONObject(NetworkClient.instance._sendJson()));
 
-        //GetMultiplayerValues(_json);
+    //    //GetMultiplayerValues(_json);
 
-        RabbitMQController.instance.SendMessageInQueue(NetworkClient.instance._sendJson());
-    }
+    //    RabbitMQController.instance.SendMessageInQueue(NetworkClient.instance._sendJson());
+    //}
 
     void FixedUpdate()
     {
@@ -621,6 +623,14 @@ public class VehicleControl : MonoBehaviour
                     _m_Data.m_brake = Input.GetButton("Jump");
                     _m_Data.m_shift = Input.GetKey(KeyCode.LeftShift) | Input.GetKey(KeyCode.RightShift);
                 }
+
+                speed = _m_Data.m_speed;
+                steer = _m_Data.m_steer;
+                accel = _m_Data.m_accel;
+                brake = _m_Data.m_brake;
+                shift = _m_Data.m_shift;
+                slip = _m_Data.m_slip;
+                slip2 = _m_Data.m_slip2;
 
                 if (!carSetting.automaticGear)
                 {
@@ -693,14 +703,6 @@ public class VehicleControl : MonoBehaviour
                 accel = 1.0f;
             }
         }
-
-        speed = _m_Data.m_speed;
-        steer = _m_Data.m_steer;
-        accel = _m_Data.m_accel;
-        brake = _m_Data.m_brake;
-        shift = _m_Data.m_shift;
-        slip = _m_Data.m_slip;
-        slip2 = _m_Data.m_slip2;
 
         if (!carWheels.wheels.frontWheelDrive && !carWheels.wheels.backWheelDrive)
             accel = 0.0f;

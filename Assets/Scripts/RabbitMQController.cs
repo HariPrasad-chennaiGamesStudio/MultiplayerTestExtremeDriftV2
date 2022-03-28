@@ -11,13 +11,26 @@ using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 using UnityEngine.Events;
 using RabbitMQ.Client.Logging;
+using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
 
 public class RabbitMQController : MonoBehaviour
 {
     public static RabbitMQController instance;
+
+    //Currently using '.Net Standard 2.0' dlls.  
+    //Based on Project Settings .Net compatability, Need to use the dlls accordingly
+    
+    //Durable(the queue will survive a broker restart)
+    //Exclusive(used by only one connection and the queue will be deleted when that connection closes)
+    //Auto-delete(queue that has had at least one consumer is deleted when last consumer unsubscribes)
+    //Arguments(optional; used by plugins and broker-specific features such as message TTL, queue length limit, etc)
+
     private EventingBasicConsumer consumer;
     private IConnection connection;
-    private IModel channel;
+    private IModel sendChannel;
+    private IModel receiveChannel;
 
     private Task connectionTask;
 
@@ -52,6 +65,7 @@ public class RabbitMQController : MonoBehaviour
 
     public void UpdateQueueName(string client_Id)
     {
+        Debug.Log("queueNameSend = " + client_Id);
         queueNameSend = client_Id;
     }
 
@@ -81,7 +95,8 @@ public class RabbitMQController : MonoBehaviour
 
 
             connection = factory.CreateConnection();
-            channel = connection.CreateModel();
+            sendChannel = connection.CreateModel();
+            receiveChannel = connection.CreateModel();
 
             Debug.Log("CONNECTED");
         }
@@ -92,17 +107,7 @@ public class RabbitMQController : MonoBehaviour
             Debug.Log("Message: " + e.Message);
             Debug.Log("Inner Exception: " + e.InnerException.ToString());
 
-            if (channel != null)
-            {
-                channel.Close();
-                channel.Dispose();
-            }
-
-            if (connection != null)
-            {
-                connection.Close();
-                connection.Dispose();
-            }
+            Disconnect();
         }
     }
 
@@ -116,22 +121,22 @@ public class RabbitMQController : MonoBehaviour
             //                                autoDelete: true,
             //                                arguments: null);
 
-            channel.ExchangeDeclare(exchange: exchangeName, type: ExchangeType.Fanout, durable: false, autoDelete: true, arguments: null);
+            receiveChannel.ExchangeDeclare(exchange: exchangeName, type: ExchangeType.Fanout, durable: false, autoDelete: true, arguments: null);
 
-            var args = new Dictionary<string, object>();
-            args.Add("x-message-ttl", 500);
-            var queueName = channel.QueueDeclare(durable:false, autoDelete: true, exclusive:false, arguments: args).QueueName;
+            //var args = new Dictionary<string, object>();
+            //args.Add("x-message-ttl", 500);
+            var queueName = receiveChannel.QueueDeclare(durable:false, autoDelete: true, arguments: null).QueueName;
 
-        
-            channel.QueueBind(queue: queueName,
+
+        receiveChannel.QueueBind(queue: queueName,
                                   exchange: exchangeName,
                                   routingKey: "",
-                                  arguments: args);
+                                  arguments: null);
 
-            consumer = new EventingBasicConsumer(channel);
+            consumer = new EventingBasicConsumer(receiveChannel);
 
             consumer.Received += OnReceiveMessageFromQueue;
-            channel.BasicConsume(queue: queueName, autoAck: true, consumer: consumer);
+            receiveChannel.BasicConsume(queue: queueName, autoAck: true, consumer: consumer);
         //}
         //catch (Exception e)
         //{
@@ -160,10 +165,10 @@ public class RabbitMQController : MonoBehaviour
 
         //try
         //{ 
-            var args = new Dictionary<string, object>();
-            args.Add("x-message-ttl", 5000);
+            //var args = new Dictionary<string, object>();
+            //args.Add("x-message-ttl", 5000);
 
-            channel.QueueDeclare(queue: queueNameSend,
+            sendChannel.QueueDeclare(queue: queueNameSend,
                                             durable: false,
                                             exclusive: false,
                                             autoDelete: true,
@@ -195,7 +200,7 @@ public class RabbitMQController : MonoBehaviour
 
     public void SendMessageInQueue(string message)
     {
-        if (channel != null)
+        if (sendChannel != null)
         {
             //var body = Encoding.UTF8.GetBytes(message);
             //Debug.Log(queueNameSend + " -- SendMessage == " + message);
@@ -205,48 +210,107 @@ public class RabbitMQController : MonoBehaviour
             //                     basicProperties: null,
             //                     body: body);
 
-            //Debug.Log("Send Message == " + message);
+            Debug.Log("Send Message == " + message);
 
             byte[] body = Encoding.UTF8.GetBytes(message);
 
-            IBasicProperties props = channel.CreateBasicProperties();
+            IBasicProperties props = sendChannel.CreateBasicProperties();
             props.ContentType = "text/plain";
             props.DeliveryMode = 2;
             props.Persistent = false;
-            props.Expiration = "5000";
+            props.Expiration = "10000";
 
-            channel.BasicPublish(exchange: "",
+            sendChannel.BasicPublish(exchange: "",
                                routingKey: queueNameSend,
                                basicProperties: props,
                                body: body);
+
+            body = null;
+        }
+    }
+
+    public void SendMessageInQueue(object message)
+    {
+        if (sendChannel != null)
+        {
+            //var body = Encoding.UTF8.GetBytes(message);
+            //Debug.Log(queueNameSend + " -- SendMessage == " + message);
+
+            //channel.BasicPublish(exchange: "",
+            //                     routingKey: queueNameSend,//queue name
+            //                     basicProperties: null,
+            //                     body: body);
+
+            Debug.Log("Send Message == " + BitConverter.ToString(ObjectToByteArray(message)));
+
+            //byte[] body = Encoding.UTF8.GetBytes(message);
+
+            IBasicProperties props = sendChannel.CreateBasicProperties();
+            props.ContentType = "text/plain";
+            props.DeliveryMode = 2;
+            props.Persistent = false;
+            props.Expiration = "10000";
+
+            sendChannel.BasicPublish(exchange: "",
+                               routingKey: queueNameSend,
+                               basicProperties: props,
+                               body: ObjectToByteArray(message));
         }
     }
 
     private void OnReceiveMessageFromQueue(object sender, BasicDeliverEventArgs ea)
     {
-        var body = ea.Body.ToArray();
-        var message = Encoding.UTF8.GetString(body);
+        //var body = ea.Body.ToArray();
+        //var message = Encoding.UTF8.GetString(body);
 
         _executionQueue.Enqueue(() => {
-            TriggetOnMessageReceived(message);
+            TriggetOnMessageReceived(ea.Body.ToArray());
         });
 
         //channel.BasicAck(ea.DeliveryTag, false);
     }
 
-    private void TriggetOnMessageReceived(string message)
+    [System.Serializable]
+    private struct ReceivedData
     {
-        //Debug.Log("Consumed Message = " + message);
+        public int action;
+        public string id;
+        public MultiplayerPlayersPlacement data;
+    }
 
-        JObject jobj = JObject.Parse(message);
+    private ReceivedData _receivedData;
 
-        int action = (int)jobj["action"];
+    private void TriggetOnMessageReceived(byte[] _data)
+    {
+        //Debug.Log("Consumed Message TOP");
+        //Debug.Log("Consumed Message TOP == " + BitConverter.ToString(_data));
+        //_receivedData = ByteArrayToObject<ReceivedData>(_data);
+        //Debug.Log(_receivedData.action + " :: " + _receivedData.id);
+        //if (_receivedData.action == 3)
+        //{
+        //    NetworkClient.instance.UpdatePosition(_receivedData.id, _receivedData.data);
+        //}
 
-        if (action == 3)
-        {
-            //NetworkClient.instance.UpdatePosition((string)jobj["id"], (float)jobj["x"], (float)jobj["y"], (float)jobj["z"]);
-            NetworkClient.instance.UpdatePosition((string)jobj["id"], jobj["data"].ToString());
-        }
+        //var _rData = ByteArrayToObject<MultiplayerPlayersPlacement>(_data);
+        //NetworkClient.instance.UpdatePosition(_rData.id, _rData);
+
+        //Debug.Log(_rData.id + " == " + _rData.p.x + " :: " + _rData.p.y + " :: " + _rData.p.z);
+
+
+        //Debug.Log(" == " + Encoding.UTF8.GetString(_data));
+        NetworkClient.instance.UpdatePosition(Encoding.UTF8.GetString(_data).Split('|'));
+
+        _data = null;
+
+        //JObject jobj = JObject.Parse(message);
+
+        //int action = (int)jobj["action"];
+
+        //if (action == 3)
+        //{
+        //    //NetworkClient.instance.UpdatePosition((string)jobj["id"], (float)jobj["x"], (float)jobj["y"], (float)jobj["z"]);
+        //    NetworkClient.instance.UpdatePosition((string)jobj["id"], jobj["data"].ToString());
+        //}
         //else if (action == 1)
         //{
         //    string innerMessage = (string)jobj["color"];
@@ -271,13 +335,27 @@ public class RabbitMQController : MonoBehaviour
             consumer.Received -= OnReceiveMessageFromQueue;
             consumer = null;
         }
-        channel.Close();
-        channel.Dispose();
-        channel = null;
-        connection.Close();
-        connection.Dispose();
-        connection = null;
 
+        if (receiveChannel != null)
+        {
+            receiveChannel.Close();
+            receiveChannel.Dispose();
+            receiveChannel = null;
+        }
+
+        if (sendChannel != null)
+        {
+            sendChannel.Close();
+            sendChannel.Dispose();
+            sendChannel = null;
+        }
+
+        if (connection != null)
+        {
+            connection.Close();
+            connection.Dispose();
+            connection = null;
+        }
         _executionQueue.Clear();
     }
 
@@ -289,6 +367,25 @@ public class RabbitMQController : MonoBehaviour
             {
                 _executionQueue.Dequeue().Invoke();
             }
+        }
+    }
+
+    public byte[] ObjectToByteArray(object obj)
+    {
+        using (var ms = new MemoryStream())
+        {
+            var bf = new BinaryFormatter();
+            bf.Serialize(ms, obj);
+            return ms.ToArray();
+        }
+    }
+
+    public T ByteArrayToObject<T>(byte[] arrBytes)
+    {
+        using (var ms = new MemoryStream(arrBytes))
+        {
+            var _BinaryFormatter = new BinaryFormatter();
+            return (T)_BinaryFormatter.Deserialize(ms);
         }
     }
 }
